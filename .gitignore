@@ -1,0 +1,159 @@
+# ==================== Python ====================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ==================== Virtual Environments ====================
+venv/
+ENV/
+env/
+.venv
+.env
+
+# ==================== IDE & Editors ====================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+.vim/
+.emacs
+*.code-workspace
+
+# ==================== Jupyter Notebooks ====================
+.ipynb_checkpoints
+*.ipynb
+.jupyter/
+
+# ==================== Project Data ====================
+raw/
+*.h5
+*.hdf5
+processed/
+sequences/
+temp/
+tmp/
+
+# ==================== Model Checkpoints ====================
+checkpoints/**/*.pth
+checkpoints/**/*.pt
+checkpoints/**/*.ckpt
+!checkpoints/.gitkeep
+lightning_logs/
+
+# ==================== Results & Outputs ====================
+results/
+evaluation/
+*.csv
+images/grids/
+images/sequences/
+images/gifs/
+geotiffs/
+*.tif
+*.tiff
+*.nc
+
+# ==================== Logs ====================
+*.log
+logs/
+*.err
+*.out
+
+# ==================== OS Files ====================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.directory
+
+# ==================== Package Wheels ====================
+*.whl
+*.wheel
+GDAL-*.whl
+
+# ==================== Sensitive Data ====================
+.env
+.env.local
+secrets.json
+credentials.json
+config.local.py
+mosdac_credentials.txt
+passwords.txt
+
+# ==================== Testing ====================
+.pytest_cache/
+.coverage
+htmlcov/
+.hypothesis/
+.tox/
+
+# ==================== Documentation ====================
+site/
+docs/_build/
+.mkdocs.yml
+
+# ==================== Miscellaneous ====================
+*.tmp
+*.bak
+*.backup
+*.swp
+failed_files.txt
+diagnostic_output.txt
+debug/
+.cache/
+.tmp/
+*.pid
+nohup.out
+
+# ==================== Specific to this project ====================
+# Temporary files
+temp_*.npy
+temp_*.h5
+test_output/
+
+# Large files (keep if necessary, uncomment to exclude)
+# raw/
+# processed/
+# sequences/
+
+# Development scripts
+dev_*.py
+experiment_*.py
+
+# ==================== Compiled files ====================
+*.o
+*.so
+*.dll
+*.dylib
+*.exe
+*.out
+
+# ==================== Version control ====================
+.git
+.gitkeep

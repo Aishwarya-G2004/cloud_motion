@@ -1,0 +1,112 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "insat-cloud-forecasting"
+version = "1.0.0"
+description = "Cloud forecasting using INSAT3DR satellite imagery and DDPM models"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+keywords = ["cloud-forecasting", "satellite-imagery", "DDPM", "diffusion-models", "INSAT3DR"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: GPU :: NVIDIA CUDA :: 11.8",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+    "Topic :: Scientific/Engineering :: Image Processing",
+]
+
+dependencies = [
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "pytorch-lightning>=2.0.0",
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "opencv-python>=4.8.0",
+    "Pillow>=10.0.0",
+    "h5py>=3.9.0",
+    "matplotlib>=3.7.0",
+    "plotly>=5.17.0",
+    "streamlit>=1.28.0",
+    "torchmetrics>=0.12.0",
+    "tqdm>=4.66.0",
+    "requests>=2.31.0",
+    "netCDF4>=1.6.0",
+    "scikit-image>=0.21.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "black>=23.9.0",
+    "flake8>=6.1.0",
+    "isort>=5.12.0",
+    "mypy>=1.5.0",
+]
+geospatial = [
+    "gdal>=3.7.0",
+    "rasterio>=1.3.0",
+]
+jupyter = [
+    "jupyter>=1.0.0",
+    "jupyterlab>=4.0.0",
+    "ipython>=8.15.0",
+    "ipywidgets>=8.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/insat-cloud-forecasting"
+Documentation = "https://github.com/yourusername/insat-cloud-forecasting/blob/main/README.md"
+Repository = "https://github.com/yourusername/insat-cloud-forecasting.git"
+Issues = "https://github.com/yourusername/insat-cloud-forecasting/issues"
+
+[tool.setuptools]
+packages = ["preprocessor"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | venv
+  | build
+  | dist
+  | __pycache__
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip_gitignore = true
+
+[tool.flake8]
+max-line-length = 100
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "build",
+    "dist",
+]
+ignore = ["E203", "W503"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
