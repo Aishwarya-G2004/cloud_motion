@@ -49,9 +49,9 @@ env/
 .jupyter/
 
 # ==================== Project Data ====================
-raw/
-*.h5
-*.hdf5
+# raw/              # Keep raw folder structure, exclude only data files
+*.h5              # Exclude HDF5 data files (too large for GitHub)
+*.hdf5            # Exclude HDF5 data files
 processed/
 sequences/
 temp/
