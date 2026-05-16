@@ -10,20 +10,34 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-# ── Config ─────────────────────────────────────────────────────────────
-SEQUENCE_DIR = r"D:\Insat_data\sequences"
-RESULTS_DIR  = r"D:\Insat_data\results"
-CKPT_DIR     = r"D:\Insat_data\checkpoints"
-CHANNELS     = 3
-INPUT_FRAMES = 4
-IMG_SIZE     = 64
-BATCH_SIZE   = 4
-LR           = 1e-4
-MAX_EPOCHS   = 50
-TIMESTEPS    = 1000
+# Load environment variables from .env file (if it exists)
+from dotenv import load_dotenv
+load_dotenv()
 
-os.makedirs(RESULTS_DIR, exist_ok=True)
-os.makedirs(CKPT_DIR,    exist_ok=True)
+# Import dynamic configuration
+from config import (
+    SEQUENCES_DIR,
+    RESULTS_DIR,
+    CHECKPOINTS_DIR,
+    NUM_CHANNELS,
+    INPUT_FRAMES,
+    IMG_SIZE,
+    BATCH_SIZE,
+    LEARNING_RATE,
+    MAX_EPOCHS,
+    TIMESTEPS,
+    DEVICE,
+    ensure_dirs
+)
+
+# ── Config ─────────────────────────────────────────────────────────────
+SEQUENCE_DIR = str(SEQUENCES_DIR)
+RESULTS_DIR  = str(RESULTS_DIR)
+CKPT_DIR     = str(CHECKPOINTS_DIR)
+CHANNELS     = NUM_CHANNELS
+LR           = LEARNING_RATE
+
+ensure_dirs()
 
 print(f"GPU: {torch.cuda.is_available()}")
 

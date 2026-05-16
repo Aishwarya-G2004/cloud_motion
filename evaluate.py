@@ -15,18 +15,33 @@ from torchmetrics.image import (
     PeakSignalNoiseRatio
 )
 
-# ── Config ─────────────────────────────────────────────────────────────
-SEQUENCE_DIR = r"D:\Insat_data\sequences"
-CKPT_PATH    = r"D:\Insat_data\checkpoints\best_model_ddpm.pth"
-EVAL_DIR     = r"D:\Insat_data\evaluation"
-CHANNELS     = 3
-INPUT_FRAMES = 4
-IMG_SIZE     = 64
-TIMESTEPS    = 1000
-CH_NAMES     = ['TIR1', 'TIR2', 'WV']
-DEVICE       = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# Load environment variables from .env file (if it exists)
+from dotenv import load_dotenv
+load_dotenv()
 
-os.makedirs(EVAL_DIR, exist_ok=True)
+# Import dynamic configuration
+from config import (
+    SEQUENCES_DIR,
+    BEST_MODEL_DDPM_PATH,
+    EVALUATION_DIR,
+    CHECKPOINTS_DIR,
+    NUM_CHANNELS,
+    INPUT_FRAMES,
+    IMG_SIZE,
+    TIMESTEPS,
+    CHANNEL_NAMES,
+    DEVICE,
+    ensure_dirs
+)
+
+# ── Config ─────────────────────────────────────────────────────────────
+SEQUENCE_DIR = str(SEQUENCES_DIR)
+CKPT_PATH = str(BEST_MODEL_DDPM_PATH)
+EVAL_DIR = str(EVALUATION_DIR)
+CHANNELS = NUM_CHANNELS
+CH_NAMES = CHANNEL_NAMES
+
+ensure_dirs()
 
 # ── DDPM Scheduler ─────────────────────────────────────────────────────
 class DDPMScheduler:
@@ -166,11 +181,37 @@ model = DiffusionUNet(
     in_ch=CHANNELS + INPUT_FRAMES * CHANNELS,
     out_ch=CHANNELS, time_dim=128
 ).to(DEVICE)
-ckpt  = torch.load(CKPT_PATH, map_location=DEVICE)
-model.load_state_dict(ckpt['model_state'])
-model.eval()
-scheduler = DDPMScheduler(TIMESTEPS)
-print(f"Loaded from epoch {ckpt['epoch']} | val_loss={ckpt['val_loss']:.4f}")
+
+# Find best Lightning checkpoint (lowest val_loss)
+import os
+from glob import glob
+ckpt_files = sorted(glob(os.path.join(str(CHECKPOINTS_DIR), "lightning_*.ckpt")))
+if ckpt_files:
+    # Extract val_loss from filename: lightning_epoch=48_val_loss=0.0783.ckpt
+    best_ckpt = min(ckpt_files, key=lambda x: float(x.split("val_loss=")[1].rstrip(".ckpt")))
+    epoch = int(best_ckpt.split("epoch=")[1].split("_")[0])
+    val_loss = float(best_ckpt.split("val_loss=")[1].rstrip(".ckpt"))
+    print(f"Found best checkpoint: epoch={epoch}, val_loss={val_loss:.4f}")
+    
+    # Load Lightning checkpoint and strip "model." prefix
+    ckpt = torch.load(best_ckpt, map_location=DEVICE)
+    state_dict = ckpt['state_dict']
+    
+    # Remove "model." prefix from all keys (Lightning wraps models with this prefix)
+    new_state_dict = {}
+    for key, value in state_dict.items():
+        if key.startswith("model."):
+            new_key = key.replace("model.", "", 1)
+            new_state_dict[new_key] = value
+        else:
+            new_state_dict[key] = value
+    
+    model.load_state_dict(new_state_dict)
+    model.eval()
+    scheduler = DDPMScheduler(TIMESTEPS)
+    print(f"✓ Model loaded from: {os.path.basename(best_ckpt)}")
+else:
+    raise FileNotFoundError("No Lightning checkpoints found in checkpoints/ directory. Please run train.py first.")
 
 # ── Test split ─────────────────────────────────────────────────────────
 dataset    = INSATDataset(SEQUENCE_DIR)

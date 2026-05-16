@@ -1,11 +1,16 @@
-# ==================== Python ====================
+﻿# Credentials and secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Python artifacts
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
 build/
-develop-eggs/
 dist/
 downloads/
 eggs/
@@ -23,137 +28,109 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# ==================== Virtual Environments ====================
+# Virtual environments
+.venv/
 venv/
 ENV/
 env/
-.venv
-.env
 
-# ==================== IDE & Editors ====================
+# IDE & editors
 .vscode/
 .idea/
+*.sublime-project
+*.sublime-workspace
 *.swp
 *.swo
 *~
 .DS_Store
-*.sublime-project
-*.sublime-workspace
+*.code-workspace
 .vim/
 .emacs
-*.code-workspace
 
-# ==================== Jupyter Notebooks ====================
+# Jupyter
 .ipynb_checkpoints
 *.ipynb
 .jupyter/
 
-# ==================== Project Data ====================
-# raw/              # Keep raw folder structure, exclude only data files
-*.h5              # Exclude HDF5 data files (too large for GitHub)
-*.hdf5            # Exclude HDF5 data files
-processed/
-sequences/
-temp/
-tmp/
-
-# ==================== Model Checkpoints ====================
+# Large data and generated artifacts
+raw/*.h5
+raw/*.hdf5
+!raw/.gitkeep
+processed/*.npy
+!processed/.gitkeep
+sequences/*.npy
+sequences/*.pkl
+!sequences/.gitkeep
 checkpoints/**/*.pth
 checkpoints/**/*.pt
 checkpoints/**/*.ckpt
+checkpoints/**/*.safetensors
+checkpoints/lightning_logs/
 !checkpoints/.gitkeep
-lightning_logs/
-
-# ==================== Results & Outputs ====================
-results/
-evaluation/
-*.csv
-images/grids/
-images/sequences/
-images/gifs/
+!checkpoints/lightning_logs/.gitkeep
+results/**
+!results/.gitkeep
+evaluation/**/*.png
+evaluation/**/*.pdf
+evaluation/**/*.csv
+!evaluation/.gitkeep
+images/**/*.png
+images/**/*.jpg
+images/**/*.jpeg
+!images/.gitkeep
+!images/grids/.gitkeep
+!images/sequences/.gitkeep
+!images/gifs/.gitkeep
 geotiffs/
 *.tif
 *.tiff
-*.nc
+failed_files.txt
+temp/
+tmp/
+test_output/
 
-# ==================== Logs ====================
+# Logs and temporary files
 *.log
 logs/
 *.err
 *.out
+debug.log
+debug/
+*.pid
+nohup.out
 
-# ==================== OS Files ====================
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
+# OS-specific
 ehthumbs.db
 Thumbs.db
+.Spotlight-V100
+.Trashes
 .directory
 
-# ==================== Package Wheels ====================
+# Package wheels
 *.whl
 *.wheel
 GDAL-*.whl
 
-# ==================== Sensitive Data ====================
-.env
-.env.local
+# Sensitive local files
 secrets.json
 credentials.json
 config.local.py
 mosdac_credentials.txt
 passwords.txt
 
-# ==================== Testing ====================
+# Testing
 .pytest_cache/
 .coverage
 htmlcov/
 .hypothesis/
 .tox/
 
-# ==================== Documentation ====================
-site/
-docs/_build/
-.mkdocs.yml
-
-# ==================== Miscellaneous ====================
+# Misc
 *.tmp
 *.bak
 *.backup
-*.swp
-failed_files.txt
-diagnostic_output.txt
-debug/
+.failed_files.txt
+cache/
 .cache/
 .tmp/
-*.pid
-nohup.out
 
-# ==================== Specific to this project ====================
-# Temporary files
-temp_*.npy
-temp_*.h5
-test_output/
-
-# Large files (keep if necessary, uncomment to exclude)
-# raw/
-# processed/
-# sequences/
-
-# Development scripts
-dev_*.py
-experiment_*.py
-
-# ==================== Compiled files ====================
-*.o
-*.so
-*.dll
-*.dylib
-*.exe
-*.out
-
-# ==================== Version control ====================
-.git
-.gitkeep

@@ -19,6 +19,23 @@ from torchmetrics.image import (
     PeakSignalNoiseRatio
 )
 
+# Load environment variables from .env file (if it exists)
+from dotenv import load_dotenv
+load_dotenv()
+
+# Import dynamic configuration
+from config import (
+    NUM_CHANNELS,
+    INPUT_FRAMES,
+    IMG_SIZE,
+    CHANNEL_NAMES,
+    BEST_MODEL_PATH,
+    SEQUENCES_DIR,
+    DEVICE,
+    CHECKPOINTS_DIR,
+    TIMESTEPS
+)
+
 st.set_page_config(
     page_title="Chase the Cloud",
     page_icon="🌩️",
@@ -39,20 +56,36 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-CHANNELS     = 3
-INPUT_FRAMES = 4
-IMG_SIZE     = 64
-CH_NAMES     = ['TIR1', 'TIR2', 'WV']
+CHANNELS     = NUM_CHANNELS
+CH_NAMES     = CHANNEL_NAMES
 CH_FULL      = {
     'TIR1': 'Thermal IR Band 1 — Cloud top temperature (best for cloud detection)',
     'TIR2': 'Thermal IR Band 2 — Surface temperature proxy',
     'WV'  : 'Water Vapor — Atmospheric moisture content'
 }
-CKPT_PATH = r"D:\Insat_data\checkpoints\best_model.pth"
-SEQ_DIR   = r"D:\Insat_data\sequences"
-DEVICE    = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+CKPT_PATH = str(BEST_MODEL_PATH)
+SEQ_DIR   = str(SEQUENCES_DIR)
 
 
+# ── DDPM Scheduler ─────────────────────────────────────────────────────
+class DDPMScheduler:
+    def __init__(self, timesteps=1000):
+        self.T         = timesteps
+        self.betas     = torch.linspace(1e-4, 0.02, timesteps)
+        self.alphas    = 1.0 - self.betas
+        self.alpha_bar = torch.cumprod(self.alphas, dim=0)
+        self.sqrt_alpha_bar    = torch.sqrt(self.alpha_bar)
+        self.sqrt_one_minus_ab = torch.sqrt(1.0 - self.alpha_bar)
+        self.alpha_bar_prev    = torch.cat(
+            [torch.tensor([1.0]), self.alpha_bar[:-1]]
+        )
+        self.posterior_variance = (
+            self.betas * (1 - self.alpha_bar_prev) /
+            (1 - self.alpha_bar)
+        )
+
+
+# ── Model ──────────────────────────────────────────────────────────────
 class ConvBlock(nn.Module):
     def __init__(self, in_ch, out_ch):
         super().__init__()
@@ -68,51 +101,132 @@ class ConvBlock(nn.Module):
         return self.net(x)
 
 
-class UNet(nn.Module):
-    def __init__(self, in_ch, out_ch):
+class TimeEmbedding(nn.Module):
+    def __init__(self, dim):
         super().__init__()
+        self.dim = dim
+        self.mlp = nn.Sequential(
+            nn.Linear(dim, dim * 4),
+            nn.SiLU(),
+            nn.Linear(dim * 4, dim),
+        )
+    def forward(self, t):
+        half  = self.dim // 2
+        freqs = torch.exp(
+            -torch.arange(half, device=t.device) *
+            (torch.log(torch.tensor(10000.0)) / (half - 1))
+        )
+        args  = t[:, None].float() * freqs[None]
+        embed = torch.cat([torch.sin(args), torch.cos(args)], dim=-1)
+        return self.mlp(embed)
+
+
+class DiffusionUNet(nn.Module):
+    def __init__(self, in_ch, out_ch, time_dim=128):
+        super().__init__()
+        self.time_mlp   = TimeEmbedding(time_dim) 
         self.enc1       = ConvBlock(in_ch, 64)
         self.enc2       = ConvBlock(64, 128)
         self.enc3       = ConvBlock(128, 256)
         self.pool       = nn.MaxPool2d(2)
+        self.t_proj1    = nn.Linear(time_dim, 64)
+        self.t_proj2    = nn.Linear(time_dim, 128)
+        self.t_proj3    = nn.Linear(time_dim, 256)
         self.bottleneck = ConvBlock(256, 512)
+        self.t_proj_b   = nn.Linear(time_dim, 512)
         self.up3        = nn.ConvTranspose2d(512, 256, 2, stride=2)
         self.dec3       = ConvBlock(512, 256)
         self.up2        = nn.ConvTranspose2d(256, 128, 2, stride=2)
         self.dec2       = ConvBlock(256, 128)
-        self.up1        = nn.ConvTranspose2d(128, 64, 2, stride=2)
+        self.up1        = nn.ConvTranspose2d(128, 64,  2, stride=2)
         self.dec1       = ConvBlock(128, 64)
         self.out        = nn.Conv2d(64, out_ch, 1)
 
-    def forward(self, x):
-        e1 = self.enc1(x)
-        e2 = self.enc2(self.pool(e1))
-        e3 = self.enc3(self.pool(e2))
-        b  = self.bottleneck(self.pool(e3))
-        d3 = self.dec3(torch.cat([self.up3(b),  e3], dim=1))
-        d2 = self.dec2(torch.cat([self.up2(d3), e2], dim=1))
-        d1 = self.dec1(torch.cat([self.up1(d2), e1], dim=1))
-        return torch.sigmoid(self.out(d1))
+    def forward(self, x, t):
+        t_emb = self.time_mlp(t)
+        e1    = self.enc1(x) + self.t_proj1(t_emb).view(-1,64,1,1)
+        e2    = self.enc2(self.pool(e1)) + \
+                self.t_proj2(t_emb).view(-1,128,1,1)
+        e3    = self.enc3(self.pool(e2)) + \
+                self.t_proj3(t_emb).view(-1,256,1,1)
+        b     = self.bottleneck(self.pool(e3)) + \
+                self.t_proj_b(t_emb).view(-1,512,1,1)
+        d3    = self.dec3(torch.cat([self.up3(b),  e3], dim=1))
+        d2    = self.dec2(torch.cat([self.up2(d3), e2], dim=1))
+        d1    = self.dec1(torch.cat([self.up1(d2), e1], dim=1))
+        return self.out(d1)
+
+
+# ── DDIM inference ─────────────────────────────────────────────────────
+@torch.no_grad()
+def ddim_sample(model, cond, scheduler, steps=50):
+    """DDIM sampling for cloud prediction"""
+    ddim_ts = torch.linspace(0, scheduler.T - 1, steps, dtype=torch.long).flip(0)
+    x = torch.randn(cond.shape[0], CHANNELS, IMG_SIZE, IMG_SIZE, device=DEVICE)
+    for i, t_val in enumerate(ddim_ts):
+        t_b = torch.full((cond.shape[0],), t_val, dtype=torch.long, device=DEVICE)
+        x_in = torch.cat([x, cond], dim=1)
+        noise_pred = model(x_in, t_b)
+        ab = scheduler.alpha_bar[t_val].to(DEVICE)
+        pred_x0 = (x - torch.sqrt(1-ab)*noise_pred) / torch.sqrt(ab)
+        pred_x0 = pred_x0.clamp(0, 1)
+        if i < len(ddim_ts) - 1:
+            t_next = ddim_ts[i+1]
+            ab_next = scheduler.alpha_bar[t_next].to(DEVICE)
+            x = torch.sqrt(ab_next) * pred_x0 + torch.sqrt(1-ab_next) * torch.randn_like(x)
+        else:
+            x = pred_x0
+    return x
 
 
 @st.cache_resource
 def load_model():
-    m    = UNet(INPUT_FRAMES * CHANNELS, CHANNELS).to(DEVICE)
-    ckpt = torch.load(CKPT_PATH, map_location=DEVICE)
-    m.load_state_dict(ckpt['model_state'])
-    m.eval()
-    return m, ckpt.get('epoch', 0), ckpt.get('val_loss', 0.0)
+    """Load best DDPM model from Lightning checkpoint"""
+    from glob import glob
+    import os
+    
+    model = DiffusionUNet(
+        in_ch=CHANNELS + INPUT_FRAMES * CHANNELS,
+        out_ch=CHANNELS, 
+        time_dim=128
+    ).to(DEVICE)
+    
+    # Find best Lightning checkpoint (lowest val_loss)
+    ckpt_files = sorted(glob(os.path.join(str(CHECKPOINTS_DIR), "lightning_*.ckpt")))
+    if not ckpt_files:
+        raise FileNotFoundError("No Lightning checkpoints found in checkpoints/ directory. Please run train.py first.")
+    
+    best_ckpt = min(ckpt_files, key=lambda x: float(x.split("val_loss=")[1].rstrip(".ckpt")))
+    epoch = int(best_ckpt.split("epoch=")[1].split("_")[0])
+    val_loss = float(best_ckpt.split("val_loss=")[1].rstrip(".ckpt"))
+    
+    # Load Lightning checkpoint and strip "model." prefix
+    ckpt = torch.load(best_ckpt, map_location=DEVICE)
+    state_dict = ckpt['state_dict']
+    new_state_dict = {}
+    for key, value in state_dict.items():
+        if key.startswith("model."):
+            new_key = key.replace("model.", "", 1)
+            new_state_dict[new_key] = value
+        else:
+            new_state_dict[key] = value
+    
+    model.load_state_dict(new_state_dict)
+    model.eval()
+    scheduler = DDPMScheduler(TIMESTEPS)
+    return model, scheduler, epoch, val_loss
 
 
-def predict_frames(model, seq, n):
+def predict_frames(model, scheduler, seq, n):
+    """Generate next n frames using DDIM sampling"""
     preds = []
-    inp   = seq[:INPUT_FRAMES].copy()
-    for _ in range(n):
-        x    = torch.tensor(inp).unsqueeze(0).to(DEVICE)
-        x_in = x.reshape(1, INPUT_FRAMES * CHANNELS, IMG_SIZE, IMG_SIZE)
+    inp = seq[:INPUT_FRAMES].copy()
+    for step in range(n):
+        x = torch.tensor(inp).unsqueeze(0).to(DEVICE)
+        cond = x.reshape(1, INPUT_FRAMES * CHANNELS, IMG_SIZE, IMG_SIZE)
         with torch.no_grad():
-            p = model(x_in)
-        p_np = p[0].cpu().numpy()
+            pred = ddim_sample(model, cond, scheduler, steps=50)
+        p_np = pred[0].cpu().numpy()
         preds.append(p_np)
         inp = np.concatenate([inp[1:], p_np[np.newaxis]], axis=0)
     return preds
@@ -451,8 +565,8 @@ with st.sidebar:
 
     with st.spinner("Loading model..."):
         try:
-            model, epoch, val_loss = load_model()
-            st.success(f"Model loaded — Epoch {epoch}")
+            model, scheduler, epoch, val_loss = load_model()
+            st.success(f"Model loaded — Epoch {epoch} (val_loss={val_loss:.4f})")
         except Exception as e:
             st.error(f"Model error: {e}")
             st.stop()
@@ -522,7 +636,7 @@ if predict_btn:
         ch_idx = CH_NAMES.index(channel)
 
         with st.spinner("Running prediction..."):
-            preds     = predict_frames(model, seq, n_pred)
+            preds     = predict_frames(model, scheduler, seq, n_pred)
             actual_np = seq[4, ch_idx]
             prev_np   = seq[3, ch_idx]
             pred0_np  = preds[0][ch_idx]
